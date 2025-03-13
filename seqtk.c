@@ -45,6 +45,12 @@ typedef struct {
 	int8_t *rev;
 } reglist_t;
 
+typedef struct {
+    char *id;
+    char *seq;
+    char *qual;
+} SeqInfo;
+
 #include "khash.h"
 KHASH_MAP_INIT_STR(reg, reglist_t)
 KHASH_SET_INIT_INT64(64)
@@ -2061,6 +2067,64 @@ int stk_telo(int argc, char *argv[])
 	return 0;
 }
 
+int cmp_seqinfo(const void *a, const void *b) {
+    SeqInfo *sa = (SeqInfo *)a;
+    SeqInfo *sb = (SeqInfo *)b;
+    return strcmp(sa->id, sb->id);
+}
+
+// stk_sort 函数实现
+int stk_sort(int argc, char *argv[]) {
+    gzFile fp;
+    kseq_t *seq;
+    SeqInfo *seqs = NULL;
+    int n_seqs = 0, m_seqs = 0;
+
+    // 打开文件
+    if (argc < 2) {
+        fprintf(stderr, "Usage: seqtk sort <in.fq.gz>\n");
+        return 1;
+    }
+    fp = gzopen(argv[1], "r");
+    if (fp == NULL) {
+        fprintf(stderr, "Failed to open file: %s\n", argv[1]);
+        return 1;
+    }
+    seq = kseq_init(fp);
+
+    // 读取所有序列
+    while (kseq_read(seq) >= 0) {
+        if (n_seqs >= m_seqs) {
+            m_seqs = m_seqs ? m_seqs * 2 : 1;
+            seqs = (SeqInfo *)realloc(seqs, m_seqs * sizeof(SeqInfo));
+        }
+        seqs[n_seqs].id = strdup(seq->name.s);
+        seqs[n_seqs].seq = strdup(seq->seq.s);
+        seqs[n_seqs].qual = strdup(seq->qual.s);
+        n_seqs++;
+    }
+
+    // 关闭文件
+    kseq_destroy(seq);
+    gzclose(fp);
+
+    // 对序列进行排序
+    qsort(seqs, n_seqs, sizeof(SeqInfo), cmp_seqinfo);
+
+    // 输出排序后的序列
+    for (int i = 0; i < n_seqs; i++) {
+        printf("@%s\n%s\n+\n%s\n", seqs[i].id, seqs[i].seq, seqs[i].qual);
+        free(seqs[i].id);
+        free(seqs[i].seq);
+        free(seqs[i].qual);
+    }
+
+    // 释放内存
+    free(seqs);
+
+    return 0;
+}
+
 /* main function */
 static int usage()
 {
@@ -2089,6 +2153,7 @@ static int usage()
 	fprintf(stderr, "         listhet   extract the position of each het\n");
 	fprintf(stderr, "         hpc       homopolyer-compressed sequence\n");
 	fprintf(stderr, "         telo      identify telomere repeats in asm or long reads\n");
+	fprintf(stderr, "         sort      sort FASTQ sequences by sequence ID\n");
 	fprintf(stderr, "\n");
 	return 1;
 }
@@ -2120,6 +2185,7 @@ int main(int argc, char *argv[])
 	else if (strcmp(argv[1], "hpc") == 0) return stk_hpc(argc-1, argv+1);
 	else if (strcmp(argv[1], "size") == 0) return stk_size(argc-1, argv+1);
 	else if (strcmp(argv[1], "telo") == 0) return stk_telo(argc-1, argv+1);
+	else if (strcmp(argv[1], "sort") == 0) return stk_sort(argc-1, argv+1);
 	else {
 		fprintf(stderr, "[main] unrecognized command '%s'. Abort!\n", argv[1]);
 		return 1;
