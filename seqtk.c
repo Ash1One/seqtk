@@ -1,7 +1,7 @@
 /* The MIT License
 
    Copyright (c) 2018-     Dana-Farber Cancer Institute
-                 2008-2018 Broad Institute
+				 2008-2018 Broad Institute
 
    Permission is hereby granted, free of charge, to any person obtaining
    a copy of this software and associated documentation files (the
@@ -46,9 +46,10 @@ typedef struct {
 } reglist_t;
 
 typedef struct {
-    char *id;
-    char *seq;
-    char *qual;
+	char *id;
+	char *seq;
+	char *qual;
+	int index;
 } SeqInfo;
 
 #include "khash.h"
@@ -206,23 +207,23 @@ unsigned char seq_nt16_table[256] = {
 };
 
 unsigned char seq_nt6_table[256] = {
-    0, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
-    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
-    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
-    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
-    5, 1, 5, 2,  5, 5, 5, 3,  5, 5, 5, 5,  5, 5, 5, 5,
-    5, 5, 5, 5,  4, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
-    5, 1, 5, 2,  5, 5, 5, 3,  5, 5, 5, 5,  5, 5, 5, 5,
-    5, 5, 5, 5,  4, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+	0, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+	5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+	5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+	5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+	5, 1, 5, 2,  5, 5, 5, 3,  5, 5, 5, 5,  5, 5, 5, 5,
+	5, 5, 5, 5,  4, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+	5, 1, 5, 2,  5, 5, 5, 3,  5, 5, 5, 5,  5, 5, 5, 5,
+	5, 5, 5, 5,  4, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
 
-    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
-    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
-    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
-    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
-    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
-    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
-    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
-    5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5
+	5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+	5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+	5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+	5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+	5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+	5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+	5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,
+	5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5,  5, 5, 5, 5
 };
 
 char *seq_nt16_rev_table = "XACMGRSVTWYHKDBN";
@@ -297,7 +298,7 @@ static inline void stk_printseq(FILE *fp, const kseq_t *s, int line_len)
 /* 
    64-bit Mersenne Twister pseudorandom number generator. Adapted from:
 
-     http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/VERSIONS/C-LANG/mt19937-64.c
+	 http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/VERSIONS/C-LANG/mt19937-64.c
 
    which was written by Takuji Nishimura and Makoto Matsumoto and released
    under the 3-clause BSD license.
@@ -2068,61 +2069,78 @@ int stk_telo(int argc, char *argv[])
 }
 
 int cmp_seqinfo(const void *a, const void *b) {
-    SeqInfo *sa = (SeqInfo *)a;
-    SeqInfo *sb = (SeqInfo *)b;
-    return strcmp(sa->id, sb->id);
+	SeqInfo *sa = (SeqInfo *)a;
+	SeqInfo *sb = (SeqInfo *)b;
+	int cmp = strcmp(sa->id, sb->id);
+	return cmp == 0 ? sa->index - sb->index : cmp;
 }
 
-// stk_sort 函数实现
+void cleanup_and_exit(SeqInfo *seqs, int n_seqs) {
+	for (int i = 0; i < n_seqs; i++) {
+		free(seqs[i].id);
+		free(seqs[i].seq);
+		free(seqs[i].qual);
+	}
+	free(seqs);
+}
+
 int stk_sort(int argc, char *argv[]) {
-    gzFile fp;
-    kseq_t *seq;
-    SeqInfo *seqs = NULL;
-    int n_seqs = 0, m_seqs = 0;
+	gzFile fp;
+	kseq_t *seq;
+	SeqInfo *seqs = NULL;
+	int n_seqs = 0, m_seqs = 0;
 
-    // 打开文件
-    if (argc < 2) {
-        fprintf(stderr, "Usage: seqtk sort <in.fq.gz>\n");
-        return 1;
-    }
-    fp = gzopen(argv[1], "r");
-    if (fp == NULL) {
-        fprintf(stderr, "Failed to open file: %s\n", argv[1]);
-        return 1;
-    }
-    seq = kseq_init(fp);
+	if (argc < 2) {
+		fprintf(stderr, "Usage: seqtk sort <in.fq.gz>\n");
+		return 1;
+	}
+	fp = gzopen(argv[1], "r");
+	if (fp == NULL) {
+		fprintf(stderr, "Failed to open file: %s\n", argv[1]);
+		return 1;
+	}
+	seq = kseq_init(fp);
 
-    // 读取所有序列
-    while (kseq_read(seq) >= 0) {
-        if (n_seqs >= m_seqs) {
-            m_seqs = m_seqs ? m_seqs * 2 : 1;
-            seqs = (SeqInfo *)realloc(seqs, m_seqs * sizeof(SeqInfo));
-        }
-        seqs[n_seqs].id = strdup(seq->name.s);
-        seqs[n_seqs].seq = strdup(seq->seq.s);
-        seqs[n_seqs].qual = strdup(seq->qual.s);
-        n_seqs++;
-    }
+	while (kseq_read(seq) >= 0) {
+		if (!seq->name.s || !seq->seq.s || !seq->qual.s) {
+			fprintf(stderr, "Invalid FASTQ record: missing fields\n");
+			continue;
+		}
+		if (n_seqs >= m_seqs) {
+			int new_size = m_seqs ? m_seqs + 1000 : 1000;
+			SeqInfo *tmp = realloc(seqs, new_size * sizeof(SeqInfo));
+			if (!tmp) {
+				fprintf(stderr, "Memory allocation failed: Unable to allocate %d bytes\n", m_seqs * sizeof(SeqInfo));
+				cleanup_and_exit(seqs, n_seqs);
+				kseq_destroy(seq);
+				gzclose(fp);
+				return 1;
+			}
+			seqs = tmp;
+			m_seqs = new_size;
+		}
+		seqs[n_seqs].id = strdup(seq->name.s);
+		seqs[n_seqs].seq = strdup(seq->seq.s);
+		seqs[n_seqs].qual = strdup(seq->qual.s);
+		seqs[n_seqs].index = n_seqs;
+		n_seqs++;
+	}
 
-    // 关闭文件
-    kseq_destroy(seq);
-    gzclose(fp);
+	kseq_destroy(seq);
+	gzclose(fp);
 
-    // 对序列进行排序
-    qsort(seqs, n_seqs, sizeof(SeqInfo), cmp_seqinfo);
+	qsort(seqs, n_seqs, sizeof(SeqInfo), cmp_seqinfo);
 
-    // 输出排序后的序列
-    for (int i = 0; i < n_seqs; i++) {
-        printf("@%s\n%s\n+\n%s\n", seqs[i].id, seqs[i].seq, seqs[i].qual);
-        free(seqs[i].id);
-        free(seqs[i].seq);
-        free(seqs[i].qual);
-    }
+	for (int i = 0; i < n_seqs; i++) {
+		printf("@%s\n%s\n+\n%s\n", seqs[i].id, seqs[i].seq, seqs[i].qual);
+		free(seqs[i].id);
+		free(seqs[i].seq);
+		free(seqs[i].qual);
+	}
 
-    // 释放内存
-    free(seqs);
+	free(seqs);
 
-    return 0;
+	return 0;
 }
 
 /* main function */
