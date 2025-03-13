@@ -2094,7 +2094,7 @@ int stk_sort(int argc, char *argv[]) {
 		fprintf(stderr, "Usage: seqtk sort <in.fq.gz>\n");
 		return 1;
 	}
-	fp = gzopen(argv[1], "r");
+	fp = argc > 1 && strcmp(argv[1], "-")? gzopen(argv[1], "r") : gzdopen(fileno(stdin), "r");
 	if (fp == NULL) {
 		fprintf(stderr, "Failed to open file: %s\n", argv[1]);
 		return 1;
