@@ -2094,7 +2094,7 @@ int stk_sort(int argc, char *argv[]) {
 		fprintf(stderr, "Usage: seqtk sort <in.fq.gz>\n");
 		return 1;
 	}
-	fp = argc > 1 && strcmp(argv[1], "-")? gzopen(argv[1], "r") : gzdopen(fileno(stdin), "r");
+	fp = argc > 1 && strcmp(argv[1], "-") ? gzopen(argv[1], "r") : gzdopen(fileno(stdin), "r");
 	if (fp == NULL) {
 		fprintf(stderr, "Failed to open file: %s\n", argv[1]);
 		return 1;
@@ -2107,7 +2107,7 @@ int stk_sort(int argc, char *argv[]) {
 			continue;
 		}
 		if (n_seqs >= m_seqs) {
-			int new_size = m_seqs ? m_seqs + 1000 : 1000;
+			int new_size = m_seqs ? m_seqs + 10000 : 10000;
 			SeqInfo *tmp = realloc(seqs, new_size * sizeof(SeqInfo));
 			if (!tmp) {
 				fprintf(stderr, "Memory allocation failed: Unable to allocate %d bytes\n", m_seqs * sizeof(SeqInfo));
