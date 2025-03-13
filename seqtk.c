@@ -2085,21 +2085,18 @@ void cleanup_and_exit(SeqInfo *seqs, int n_seqs) {
 }
 
 int stk_sort(int argc, char *argv[]) {
-	gzFile fp;
-	kseq_t *seq;
-	SeqInfo *seqs = NULL;
-	int n_seqs = 0, m_seqs = 0;
-
 	if (argc < 2) {
-		fprintf(stderr, "Usage: seqtk sort <in.fq.gz>\n");
+		fprintf(stderr, "Usage: seqtk sort <in.fq>\n");
 		return 1;
 	}
-	fp = argc > 1 && strcmp(argv[1], "-") ? gzopen(argv[1], "r") : gzdopen(fileno(stdin), "r");
+	gzFile fp = argc > 1 && strcmp(argv[1], "-") ? gzopen(argv[1], "r") : gzdopen(fileno(stdin), "r");
 	if (fp == NULL) {
 		fprintf(stderr, "Failed to open file: %s\n", argv[1]);
 		return 1;
 	}
-	seq = kseq_init(fp);
+	kseq_t *seq = kseq_init(fp);
+	SeqInfo *seqs = NULL;
+	int n_seqs = 0, m_seqs = 0;
 
 	while (kseq_read(seq) >= 0) {
 		if (!seq->name.s || !seq->seq.s || !seq->qual.s) {
@@ -2107,7 +2104,7 @@ int stk_sort(int argc, char *argv[]) {
 			continue;
 		}
 		if (n_seqs >= m_seqs) {
-			int new_size = m_seqs ? m_seqs + 10000 : 10000;
+			int new_size = m_seqs ? m_seqs * 2 : 1024;
 			SeqInfo *tmp = realloc(seqs, new_size * sizeof(SeqInfo));
 			if (!tmp) {
 				fprintf(stderr, "Memory allocation failed: Unable to allocate %d bytes\n", m_seqs * sizeof(SeqInfo));
@@ -2116,12 +2113,53 @@ int stk_sort(int argc, char *argv[]) {
 				gzclose(fp);
 				return 1;
 			}
+			memset(tmp + m_seqs, 0, (new_size - m_seqs) * sizeof(SeqInfo));
 			seqs = tmp;
 			m_seqs = new_size;
 		}
 		seqs[n_seqs].id = strdup(seq->name.s);
+		if (seqs[n_seqs].id == NULL) {
+			fprintf(stderr, "[E::%s] Memory allocation failed: Unable to duplicate the sequence ID\n", __func__);
+			for (int i = 0; i < n_seqs; i++) {
+				free(seqs[i].id);
+				free(seqs[i].seq);
+				free(seqs[i].qual);
+			}
+			free(seqs);
+			kseq_destroy(seq);
+			gzclose(fp);
+			return 1;
+		}
 		seqs[n_seqs].seq = strdup(seq->seq.s);
-		seqs[n_seqs].qual = strdup(seq->qual.s);
+		if (seqs[n_seqs].seq == NULL) {
+			fprintf(stderr, "[E::%s] Memory allocation failed: Unable to duplicate the sequence\n", __func__);
+			for (int i = 0; i < n_seqs; i++) {
+				free(seqs[i].id);
+				free(seqs[i].seq);
+				free(seqs[i].qual);
+			}
+			free(seqs);
+			kseq_destroy(seq);
+			gzclose(fp);
+			return 1;
+		}
+		if (seq->qual.l == seq->seq.l) {
+			seqs[n_seqs].qual = strdup(seq->qual.s);
+			if (seqs[n_seqs].qual == NULL) {
+				fprintf(stderr, "[E::%s] Memory allocation failed: Unable to duplicate the sequence quality\n", __func__);
+				for (int i = 0; i < n_seqs; i++) {
+					free(seqs[i].id);
+					free(seqs[i].seq);
+					free(seqs[i].qual);
+				}
+				free(seqs);
+				kseq_destroy(seq);
+				gzclose(fp);
+				return 1;
+			}
+		} else {
+			seqs[n_seqs].qual = NULL;
+		}
 		seqs[n_seqs].index = n_seqs;
 		n_seqs++;
 	}
@@ -2129,13 +2167,23 @@ int stk_sort(int argc, char *argv[]) {
 	kseq_destroy(seq);
 	gzclose(fp);
 
+	if (n_seqs == 0) {
+		fprintf(stderr, "No sequences found in the input file\n");
+		free(seqs);
+		return 1;
+	}
+
 	qsort(seqs, n_seqs, sizeof(SeqInfo), cmp_seqinfo);
 
 	for (int i = 0; i < n_seqs; i++) {
-		printf("@%s\n%s\n+\n%s\n", seqs[i].id, seqs[i].seq, seqs[i].qual);
+		if (seqs[i].qual) {
+			printf("@%s\n%s\n+\n%s\n", seqs[i].id, seqs[i].seq, seqs[i].qual);
+		} else {
+			printf("@%s\n%s\n", seqs[i].id, seqs[i].seq);
+		}
 		free(seqs[i].id);
 		free(seqs[i].seq);
-		free(seqs[i].qual);
+		if (seqs[i].qual) free(seqs[i].qual);
 	}
 
 	free(seqs);
