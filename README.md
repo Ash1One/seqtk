@@ -65,4 +65,4 @@ Seqtk Examples
 
 * Sort FASTQ by sequence names:
 
-        seqtk sort in.fq.gz > out.fq
+        seqtk sort in.fq > out.fq
