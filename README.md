@@ -62,3 +62,7 @@ Seqtk Examples
 * Find telomere (TTAGGG)n repeats:
 
         seqtk telo seq.fa > telo.bed 2> telo.count
+
+* Sort FASTQ by sequence names:
+
+        seqtk sort in.fq.gz > out.fq
