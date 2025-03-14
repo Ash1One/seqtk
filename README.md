@@ -67,6 +67,6 @@ Seqtk Examples
 
         seqtk sort in.fq > out.fq
 
-* Remove duplicate reads and sort by sequence names:
+* Remove duplicate reads:
 
-        seqtk usort in.fq > out.fq
+        seqtk rmdup in.fq > out.fq

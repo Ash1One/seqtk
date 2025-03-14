@@ -2177,20 +2177,22 @@ int stk_sort(int argc, char *argv[]) {
 	return 0;
 }
 
-int stk_usort(int argc, char *argv[])
+int stk_rmdup(int argc, char *argv[])
 {
-    int c, rc_flag = 0;
-    while ((c = getopt(argc, argv, "r")) >= 0) {
+    int c, rc_flag = 0, sort_flag = 0;
+    while ((c = getopt(argc, argv, "rs")) >= 0) {
         switch (c) {
             case 'r': rc_flag = 1; break;
+			case 's': sort_flag = 1; break;
         }
     }
     
     if (optind >= argc) {
 		fprintf(stderr, "\n");
-        fprintf(stderr, "Usage: seqtk usort [-r] <in.fq|in.fa>\n");
+        fprintf(stderr, "Usage: seqtk rmdup [-r] <in.fq|in.fa>\n");
 		fprintf(stderr, "\n");
-        fprintf(stderr, "Options: -r       consider reverse complement as duplicate\n\n");
+        fprintf(stderr, "Options: -r       consider reverse complement as duplicate\n");
+        fprintf(stderr, "         -s       sort sequences by id\n\n");
         return 1;
     }
     
@@ -2278,13 +2280,13 @@ int stk_usort(int argc, char *argv[])
     kseq_destroy(seq);
     gzclose(fp);
     
-    qsort(seqs, n_seqs, sizeof(SeqInfo), cmp_seqinfo);
+    if (sort_flag) qsort(seqs, n_seqs, sizeof(SeqInfo), cmp_seqinfo);
     
     for (int i = 0; i < n_seqs; i++) {
         if (seqs[i].qual) {
             printf("@%s\n%s\n+\n%s\n", seqs[i].id, seqs[i].seq, seqs[i].qual);
         } else {
-            printf(">%s\n%s", seqs[i].id, seqs[i].seq);
+            printf(">%s\n%s\n", seqs[i].id, seqs[i].seq);
         }
         free(seqs[i].id);
         free(seqs[i].seq);
@@ -2332,7 +2334,7 @@ static int usage()
 	fprintf(stderr, "         hpc       homopolyer-compressed sequence\n");
 	fprintf(stderr, "         telo      identify telomere repeats in asm or long reads\n");
 	fprintf(stderr, "         sort      sort FASTA/Q sequences by sequence ID\n");
-	fprintf(stderr, "         usort     remove FASTA/Q sequences duplicates and sort\n");
+	fprintf(stderr, "         rmdup     remove FASTA/Q sequences duplicates\n");
 	fprintf(stderr, "\n");
 	return 1;
 }
@@ -2365,7 +2367,7 @@ int main(int argc, char *argv[])
 	else if (strcmp(argv[1], "size") == 0) return stk_size(argc-1, argv+1);
 	else if (strcmp(argv[1], "telo") == 0) return stk_telo(argc-1, argv+1);
 	else if (strcmp(argv[1], "sort") == 0) return stk_sort(argc-1, argv+1);
-	else if (strcmp(argv[1], "usort") == 0) return stk_usort(argc-1, argv+1);
+	else if (strcmp(argv[1], "rmdup") == 0) return stk_rmdup(argc-1, argv+1);
 	else {
 		fprintf(stderr, "[main] unrecognized command '%s'. Abort!\n", argv[1]);
 		return 1;
