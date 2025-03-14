@@ -2075,42 +2075,48 @@ int cmp_seqinfo(const void *a, const void *b) {
 	return cmp == 0 ? sa->index - sb->index : cmp;
 }
 
-void cleanup_and_exit(SeqInfo *seqs, int n_seqs) {
+void cleanup_and_exit(SeqInfo *seqs, int n_seqs, kseq_t *seq, gzFile fp) {
 	for (int i = 0; i < n_seqs; i++) {
 		free(seqs[i].id);
 		free(seqs[i].seq);
 		free(seqs[i].qual);
 	}
 	free(seqs);
+	if (seq) kseq_destroy(seq);
+	if (fp) gzclose(fp);
 }
 
 int stk_sort(int argc, char *argv[]) {
 	if (argc < 2) {
-		fprintf(stderr, "Usage: seqtk sort <in.fq>\n");
+		fprintf(stderr, "Usage: seqtk sort <in.fq|in.fa>\n");
 		return 1;
 	}
-	gzFile fp = argc > 1 && strcmp(argv[1], "-") ? gzopen(argv[1], "r") : gzdopen(fileno(stdin), "r");
+	const char *filename = argv[1];
+	gzFile fp = argc > 1 && strcmp(filename, "-") ? gzopen(filename, "r") : gzdopen(fileno(stdin), "r");
 	if (fp == NULL) {
-		fprintf(stderr, "Failed to open file: %s\n", argv[1]);
+		fprintf(stderr, "Failed to open file: %s\n", filename);
 		return 1;
 	}
 	kseq_t *seq = kseq_init(fp);
+	if (!seq) {
+		fprintf(stderr, "Failed to initialize sequence reader\n");
+		gzclose(fp);
+		return 1;
+	}
 	SeqInfo *seqs = NULL;
 	int n_seqs = 0, m_seqs = 0;
 
 	while (kseq_read(seq) >= 0) {
-		if (!seq->name.s || !seq->seq.s || !seq->qual.s) {
-			fprintf(stderr, "Invalid FASTQ record: missing fields\n");
+		if (seq->name.l == 0 || seq->seq.l == 0) {
+			fprintf(stderr, "Invalid FASTQ/A record: missing fields\n");
 			continue;
 		}
 		if (n_seqs >= m_seqs) {
 			int new_size = m_seqs ? m_seqs * 2 : 1024;
 			SeqInfo *tmp = realloc(seqs, new_size * sizeof(SeqInfo));
 			if (!tmp) {
-				fprintf(stderr, "Memory allocation failed: Unable to allocate %d bytes\n", m_seqs * sizeof(SeqInfo));
-				cleanup_and_exit(seqs, n_seqs);
-				kseq_destroy(seq);
-				gzclose(fp);
+				fprintf(stderr, "Memory allocation failed: Unable to allocate %d bytes\n", new_size * sizeof(SeqInfo));
+				cleanup_and_exit(seqs, n_seqs, seq, fp);
 				return 1;
 			}
 			memset(tmp + m_seqs, 0, (new_size - m_seqs) * sizeof(SeqInfo));
@@ -2120,41 +2126,20 @@ int stk_sort(int argc, char *argv[]) {
 		seqs[n_seqs].id = strdup(seq->name.s);
 		if (seqs[n_seqs].id == NULL) {
 			fprintf(stderr, "[E::%s] Memory allocation failed: Unable to duplicate the sequence ID\n", __func__);
-			for (int i = 0; i < n_seqs; i++) {
-				free(seqs[i].id);
-				free(seqs[i].seq);
-				free(seqs[i].qual);
-			}
-			free(seqs);
-			kseq_destroy(seq);
-			gzclose(fp);
+			cleanup_and_exit(seqs, n_seqs, seq, fp);
 			return 1;
 		}
 		seqs[n_seqs].seq = strdup(seq->seq.s);
 		if (seqs[n_seqs].seq == NULL) {
 			fprintf(stderr, "[E::%s] Memory allocation failed: Unable to duplicate the sequence\n", __func__);
-			for (int i = 0; i < n_seqs; i++) {
-				free(seqs[i].id);
-				free(seqs[i].seq);
-				free(seqs[i].qual);
-			}
-			free(seqs);
-			kseq_destroy(seq);
-			gzclose(fp);
+			cleanup_and_exit(seqs, n_seqs, seq, fp);
 			return 1;
 		}
 		if (seq->qual.l == seq->seq.l) {
 			seqs[n_seqs].qual = strdup(seq->qual.s);
 			if (seqs[n_seqs].qual == NULL) {
 				fprintf(stderr, "[E::%s] Memory allocation failed: Unable to duplicate the sequence quality\n", __func__);
-				for (int i = 0; i < n_seqs; i++) {
-					free(seqs[i].id);
-					free(seqs[i].seq);
-					free(seqs[i].qual);
-				}
-				free(seqs);
-				kseq_destroy(seq);
-				gzclose(fp);
+				cleanup_and_exit(seqs, n_seqs, seq, fp);
 				return 1;
 			}
 		} else {
