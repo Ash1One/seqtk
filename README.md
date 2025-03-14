@@ -66,3 +66,7 @@ Seqtk Examples
 * Sort FASTQ by sequence names:
 
         seqtk sort in.fq > out.fq
+
+* Remove duplicate reads and sort by sequence names:
+
+        seqtk usort in.fq > out.fq
