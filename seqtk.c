@@ -54,6 +54,7 @@ typedef struct {
 
 #include "khash.h"
 KHASH_MAP_INIT_STR(reg, reglist_t)
+KHASH_MAP_INIT_STR(seq, int)
 KHASH_SET_INIT_INT64(64)
 
 typedef kh_reg_t reghash_t;
@@ -2176,6 +2177,132 @@ int stk_sort(int argc, char *argv[]) {
 	return 0;
 }
 
+int stk_usort(int argc, char *argv[])
+{
+    int c, rc_flag = 0;
+    while ((c = getopt(argc, argv, "r")) >= 0) {
+        switch (c) {
+            case 'r': rc_flag = 1; break;
+        }
+    }
+    
+    if (optind >= argc) {
+		fprintf(stderr, "\n");
+        fprintf(stderr, "Usage: seqtk usort [-r] <in.fq|in.fa>\n");
+		fprintf(stderr, "\n");
+        fprintf(stderr, "Options: -r       consider reverse complement as duplicate\n\n");
+        return 1;
+    }
+    
+    const char *filename = argv[optind];
+    gzFile fp = strcmp(filename, "-") ? gzopen(filename, "r") : gzdopen(fileno(stdin), "r");
+    if (fp == NULL) {
+        fprintf(stderr, "[E::%s] failed to open the input file: %s\n", __func__, filename);
+        return 1;
+    }
+    
+    kseq_t *seq = kseq_init(fp);
+    if (!seq) {
+        fprintf(stderr, "[E::%s] failed to initialize sequence reader\n", __func__);
+        gzclose(fp);
+        return 1;
+    }
+    
+    khash_t(seq) *h = kh_init(seq);
+    SeqInfo *seqs = NULL;
+    int n_seqs = 0, m_seqs = 0;
+    
+    while (kseq_read(seq) >= 0) {
+        if (seq->name.l == 0 || seq->seq.l == 0) {
+            fprintf(stderr, "[W::%s] invalid record: missing fields\n", __func__);
+            continue;
+        }
+        
+        int is_duplicate = 0;
+        khint_t k = kh_get(seq, h, seq->seq.s);
+        if (k != kh_end(h)) {
+            is_duplicate = 1;
+        } else if (rc_flag) {
+            char *rc_seq = calloc(seq->seq.l + 1, sizeof(char));
+            if (!rc_seq) {
+                fprintf(stderr, "[E::%s] memory allocation failed\n", __func__);
+                continue;
+            }
+            
+            int64_t i;
+            for (i = 0; i < seq->seq.l; ++i) {
+                rc_seq[seq->seq.l - 1 - i] = comp_tab[(int)seq->seq.s[i]];
+            }
+            rc_seq[seq->seq.l] = '\0';
+            
+            k = kh_get(seq, h, rc_seq);
+            if (k != kh_end(h)) {
+                is_duplicate = 1;
+            }
+            free(rc_seq);
+        }
+        
+        if (!is_duplicate) {
+            int ret;
+            char *seq_copy = strdup(seq->seq.s);
+            if (!seq_copy) {
+                fprintf(stderr, "[E::%s] memory allocation failed\n", __func__);
+                continue;
+            }
+            k = kh_put(seq, h, seq_copy, &ret);
+            
+            if (n_seqs == m_seqs) {
+                int new_size = m_seqs ? m_seqs * 2 : 1024;
+                SeqInfo *tmp = realloc(seqs, new_size * sizeof(SeqInfo));
+                if (!tmp) {
+                    fprintf(stderr, "[E::%s] memory allocation failed\n", __func__);
+                    free(seq_copy);
+                    break;
+                }
+                seqs = tmp;
+                m_seqs = new_size;
+            }
+            
+            seqs[n_seqs].id = strdup(seq->name.s);
+            seqs[n_seqs].seq = strdup(seq->seq.s);
+            if (seq->qual.l) {
+                seqs[n_seqs].qual = strdup(seq->qual.s);
+            } else {
+                seqs[n_seqs].qual = NULL;
+            }
+            seqs[n_seqs].index = n_seqs;
+            n_seqs++;
+        }
+    }
+    
+    kseq_destroy(seq);
+    gzclose(fp);
+    
+    qsort(seqs, n_seqs, sizeof(SeqInfo), cmp_seqinfo);
+    
+    for (int i = 0; i < n_seqs; i++) {
+        if (seqs[i].qual) {
+            printf("@%s\n%s\n+\n%s\n", seqs[i].id, seqs[i].seq, seqs[i].qual);
+        } else {
+            printf(">%s\n%s", seqs[i].id, seqs[i].seq);
+        }
+        free(seqs[i].id);
+        free(seqs[i].seq);
+        if (seqs[i].qual) free(seqs[i].qual);
+    }
+    
+    free(seqs);
+    
+    for (khint_t k = kh_begin(h); k != kh_end(h); ++k) {
+        if (kh_exist(h, k)) {
+            free((char*)kh_key(h, k));
+        }
+    }
+    kh_destroy(seq, h);
+    
+    return 0;
+}
+
 /* main function */
 static int usage()
 {
@@ -2204,7 +2331,8 @@ static int usage()
 	fprintf(stderr, "         listhet   extract the position of each het\n");
 	fprintf(stderr, "         hpc       homopolyer-compressed sequence\n");
 	fprintf(stderr, "         telo      identify telomere repeats in asm or long reads\n");
-	fprintf(stderr, "         sort      sort FASTQ sequences by sequence ID\n");
+	fprintf(stderr, "         sort      sort FASTA/Q sequences by sequence ID\n");
+	fprintf(stderr, "         usort     remove FASTA/Q sequences duplicates and sort\n");
 	fprintf(stderr, "\n");
 	return 1;
 }
@@ -2237,6 +2365,7 @@ int main(int argc, char *argv[])
 	else if (strcmp(argv[1], "size") == 0) return stk_size(argc-1, argv+1);
 	else if (strcmp(argv[1], "telo") == 0) return stk_telo(argc-1, argv+1);
 	else if (strcmp(argv[1], "sort") == 0) return stk_sort(argc-1, argv+1);
+	else if (strcmp(argv[1], "usort") == 0) return stk_usort(argc-1, argv+1);
 	else {
 		fprintf(stderr, "[main] unrecognized command '%s'. Abort!\n", argv[1]);
 		return 1;
